@@ -22,7 +22,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         if self.cors:
             self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
+
+        self.wfile.write(bytes(self.response, 'utf-8'))
         
     def do_POST(self):
         
@@ -37,9 +40,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         length = int(content_length) if content_length else 0
 
         try:
-            content = json.loads(self.rfile.read(length))
+            encoded = self.rfile.read(length)
+            content = json.loads(encoded)
         except ValueError:
             print("Failed to decode JSON")
+            print("Content Length:", length)
+            print("Request headers:", request_headers)
+            print("Request payload:", encoded)
             print("<----- Request End -----\n")
             self.send_response(500, 'JSON decode error')
             if self.cors:
@@ -59,16 +66,21 @@ class RequestHandler(BaseHTTPRequestHandler):
     
     do_PUT = do_POST
     do_DELETE = do_GET
+    do_OPTIONS = do_GET
         
-def main(port, cors):
+def main(port, cors, response):
     if port is None:
         port = 8080
     if cors is None:
         cors = False
+    if response is None:
+        response = ""
 
     RequestHandler.cors = cors
+    RequestHandler.response = response
     print('Listening on localhost: %s' % port)
     print('Cross origin header present: %s' % cors)
+    print('Responding with: %s' % response)
     server = HTTPServer(('', port), RequestHandler)
     server.serve_forever()
 
@@ -80,6 +92,7 @@ if __name__ == "__main__":
                     "   reflect [-c] [-p PORT]")
     parser.add_option("-p", "--port", action="store", type="int", help="the port number to run on")
     parser.add_option("-c", "--cors", action="store_true", dest="cors", help="add Access-Control-Allow-Origin header with value *")
+    parser.add_option("-r", "--response", action="store", type="str", help="add response to all get requests")
     (options, args) = parser.parse_args()
 
-    main(options.port, options.cors)
+    main(options.port, options.cors, options.response)
